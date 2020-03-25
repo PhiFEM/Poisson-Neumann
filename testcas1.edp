@@ -1,0 +1,120 @@
+
+load "Element_P3";
+load "Element_P4";
+
+ofstream fres("testfreefemp2l4.dat",append);
+ 
+for(int i=0; i<7; i++)
+{
+int n=8*2^i;
+
+real gamdiv=10,gam1=10,gam2=10, sigma=0.01;
+
+
+mesh TGlob=square(n,n,[x-0.5,y-0.5],flags=0);
+fespace Vind(TGlob,P1); 
+
+real R=0.47, R4=R^4, angl=pi/2;
+macro Rt R*sqrt(sqrt( 2/(5+3*sin(7*t+7*pi/36)) )) //
+border circ(t=0,2*pi){ x=Rt*cos(t+angl); y=Rt*sin(t+angl);}
+
+real cosS=1.0, sinS=0;
+func X=cosS*(x)-sinS*(y);
+func Y=sinS*(x)+cosS*(y);
+func ue=sin(X)*exp(Y);
+func uX=cos(X)*exp(Y);
+func uY=sin(X)*exp(Y);
+func f=ue;
+
+real AngleStep=0.01;
+//for(angl=0; angl<2*pi/7; angl+=AngleStep)
+{
+	real cosS=cos(angl), sinS=sin(angl);
+
+  func x2=square(x)+square(y);
+  func theta=atan2(y,x)-angl;
+  func phi=x2*x2*(5+3*sin(7*theta+7*pi/36))/2-R4;
+  func phix=4*x2*(x)*(5+3*sin(7*theta+7*pi/36))/2 + x2*(-y)*21*cos(7*theta+7*pi/36)/2;
+  func phiy=4*x2*(y)*(5+3*sin(7*theta+7*pi/36))/2 + x2*(x)*21*cos(7*theta+7*pi/36)/2;
+
+  func g=(phix*uX+phiy*uY)/sqrt(phix*phix+phiy*phiy) +phi*ue;
+
+  Vind ind=(phi<1e-10); //1 inside Omega, 0 outside
+  mesh Th = trunc(TGlob,ind>0,split=1);
+  int NbTriangles = Th.nt;
+  fespace Vind0(Th,P0); 
+  Vind0 ind0=(ind<0.8); //ind0=1 on triangles cut by gammadiv, 0 elsewhere
+  mesh ThGam = trunc(Th,ind0==1,split=1);
+ int NbTriangles2 = ThGam.nt;
+  fespace Vind1(ThGam,P1); 
+  Vind1 ind1=1-ind; // ind1=1 on dOmega_h
+
+
+//  plot(TGlob, Th, circ(200), wait=1);
+//  plot(Th, circ(200), wait=1);
+//  plot(ThGam, circ(200), wait=1);
+//plot(ind, circ(200), value=1, cmm="ind");
+//  plot(ind0, circ(200), fill=1, wait=1, value=1, cmm="ind0");
+
+
+  fespace Vh(Th,P2); 
+  fespace VhGam(ThGam,P2); 
+  fespace Zh(ThGam,[P2,P2]); 
+  fespace Qh(ThGam,P1); 
+  fespace Vphi(ThGam,P4); Vphi phih=phi;
+
+
+ 
+
+  macro nphi() sqrt(dx(phih)*dx(phih)+dy(phih)*dy(phih))  //
+  
+  varf varA([u],[v])= int2d(Th)( (dx(u)*dx(v)+dy(u)*dy(v))*(1+gam1*ind0) + u*v + gamdiv *ind0* u*v )
+				+ intalledges(Th)(sigma*hTriangle*(nTonEdge-1)*(jump(ind0)!=0)*jump(dx(u)*N.x+dy(u)*N.y)*jump(dx(v)*N.x+dy(v)*N.y))
+				// + intalledges(Th)(sigma*hTriangle*(nTonEdge-1)*(mean(ind0)>0)*jump(dx(u)*N.x+dy(u)*N.y)*jump(dx(v)*N.x+dy(v)*N.y))
+		+ int2d(Th)(f*v + gamdiv * ind0 * f*v);
+  varf varB1([y1,y2],[v])=  int1d(ThGam)((y1*N.x+y2*N.y)*v * ind1);
+  varf varB2([y1,y2],[v])= int2d(ThGam)(gamdiv*(dx(y1)+dy(y2))*v +  gam1*(y1*dx(v)+y2*dy(v)) ); 
+  varf varC([y1,y2],[z1,z2])=  
+                  int2d(ThGam)(gamdiv*(dx(y1)+dy(y2))*(dx(z1)+dy(z2))  + gam1* (y1*z1+y2*z2) + gam2/square(hTriangle)*(dx(phih)*y1+dy(phih)*y2)*(dx(phih)*z1+dy(phih)*z2))
+                + int2d(ThGam)(gamdiv*f*(dx(z1)+dy(z2)) - gam2/square(hTriangle)*g*nphi*(dx(phih)*z1+dy(phih)*z2));
+  varf varD([y1,y2],[q])= int2d(ThGam)(gam2/square(hTriangle)/hTriangle*(dx(phih)*y1+dy(phih)*y2)*phih*q);
+  varf varE([p],[q])= int2d(ThGam)(gam2/square(hTriangle)/square(hTriangle)*phih*phih*p*q)
+  				- int2d(ThGam)(gam2/square(hTriangle)/hTriangle*g*nphi*q*phih); 
+
+    matrix I=interpolate(VhGam,Vh,t=true);
+    ofstream fff("intp");
+    fff <<I;
+    matrix A=varA(Vh,Vh);
+    matrix B1=varB1(Zh,VhGam);
+    matrix B2=varB2(Zh,VhGam);
+    B1=B1+B2;
+    B1=I*B1;
+    B2=I*B2;
+    matrix C=varC(Zh,Zh);
+    matrix D=varD(Zh,Qh);
+    matrix E=varE(Qh,Qh);
+    matrix M=[[A,B1,0],[B2',C,D'],[0 ,D,E]];
+    set(M, solver=sparsesolver);
+    cout <<" M : "<<M.n<<" X "<<M.m<<endl; 
+
+ real[int] U(Vh.ndof+Zh.ndof+Qh.ndof), F(Vh.ndof+Zh.ndof+Qh.ndof);
+    F(0:Vh.ndof-1)=varA(0,Vh);
+    F(Vh.ndof:Vh.ndof+Zh.ndof-1)=varC(0,Zh);
+    F(Vh.ndof+Zh.ndof:Vh.ndof+Zh.ndof+Qh.ndof-1)=varE(0,Qh);
+    U =M^-1*F;
+    Vh u; u[]=U;
+  
+
+   plot(u,wait=1,value=1,cmm="u");
+    Vh uh=ue;
+   plot(uh,wait=1,value=1,cmm="ref");
+  Vh e=u-uh;                  
+  plot(e,wait=1,value=1,cmm="err");
+  real err0=sqrt( int2d(Th)((1-ind0)*(square(u-ue)) )); 
+  real err1=sqrt( int2d(Th)((1-ind0)* (square(dx(u)-uX)+square(dy(u)-uY))) ); 
+  real N0=sqrt( int2d(Th)((1-ind0)*square(uh) ));
+  real N1=sqrt( int2d(Th)((1-ind0)*(square(dx(uh))+square(dy(uh)))) ); 
+  fres <<"("<<sqrt(2)/n<<","<<err0/N0<<","<<err1/N1<<")"<<endl;
+
+ }
+}

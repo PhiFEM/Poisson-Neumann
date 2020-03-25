@@ -1,0 +1,101 @@
+
+//load "PETSc"
+load "Element_P3";
+load "Element_P4";
+
+ofstream fres("anglecutfemh1512.dat");
+
+{
+int n=512;
+
+
+real gamdiv=10, gam1=10, gam2=10, sigma=0.01;
+real R1=1, R2=2, R=1.1*sqrt(R1^2+R2^2), theta=0;
+
+
+
+mesh TGlob=square(n,n,[2*R*x-R,2*R*y-R], flags=0);
+plot(TGlob);
+fespace Vind(TGlob,P1); 
+
+real AngleStep=0.01;
+for(theta=0; theta<2*pi/7; theta+=AngleStep)
+{
+
+
+
+func ue=cos(pi/R1*(cos(theta)*x-sin(theta)*y))*cos(pi/R2*(sin(theta)*x+cos(theta)*y));
+func f = (R1^2*R2^2 + R1^2*pi^2 + R2^2*pi^2)*cos(pi*x*cos(theta)/R1-pi*y*sin(theta)/R1)*cos(pi*x*sin(theta)/R2 
++pi*y*cos(theta)/R2)/(R1^2*R2^2);
+func uX = -pi*(R1*sin(theta)*sin(pi*x*sin(theta)/R2+pi*y*cos(theta)/R2)*cos(pi*x*cos(theta)/R1
+-pi*y*sin(theta)/R1)+R2*sin(pi*x*cos(theta)/R1-pi*y*sin(theta)/R1)*cos(theta)*cos(pi*x*sin(theta)/R2
++pi*y*cos(theta)/R2))/(R1*R2);
+func uY = -pi*(R1*sin(pi*x*sin(theta)/R2+pi*y*cos(theta)/R2)*cos(theta)*cos(pi*x*cos(theta)/R1
+-pi*y*sin(theta)/R1) - R2*sin(theta)*sin(pi*x*cos(theta)/R1-pi*y*sin(theta)/R1)*cos(pi*x*sin(theta)/R2+
+pi*y*cos(theta)/R2))/(R1*R2);
+
+
+//plot(ue, value=1);
+
+
+
+
+  func phi=max(abs(cos(theta)*x-sin(theta)*y)/R1,abs(sin(theta)*x+cos(theta)*y)/R2)-1;
+  
+  Vind ind=(phi<1e-10); //1 inside Omega, 0 outside
+  mesh Th = trunc(TGlob,ind>0,split=1);
+  fespace Vind0(Th,P0); 
+  Vind0 ind0=ind<0.8; //ind0=1 on triangles cut by gammadiv, 0 elsewhere
+  mesh ThGam = trunc(Th,ind0==1,split=1);
+  fespace Vind1(ThGam,P1); 
+  Vind1 ind1=1-ind; // ind1=1 on dOmega_h
+Vind0 h =hTriangle;
+
+
+//  plot(TGlob, Th, circ(200), wait=1);
+  plot(Th, wait=1);
+  plot(ThGam, wait=1);
+  plot(ind0, fill=1, wait=1, value=1, cmm="ind0");
+
+
+  fespace Vh(Th,P1);
+
+
+
+ 
+  func g=0.;
+  
+  
+
+  macro nphi() sqrt(dx(phih)*dx(phih)+dy(phih)*dy(phih))  //
+  
+  varf varA([u],[v])= int2d(Th,levelset=phi)(dx(u)*dx(v)+dy(u)*dy(v)+u*v)
+				 + intalledges(Th)(sigma*hTriangle*(nTonEdge-1)*(mean(ind0)>0)*jump(dx(u)*N.x+dy(u)*N.y)*jump(dx(v)*N.x+dy(v)*N.y))				
+		+ int2d(Th,levelset=phi)(f*v) + int1d(Th,levelset=phi)(g*v);
+
+
+
+    matrix A=varA(Vh,Vh);
+    set(A, solver=UMFPACK);
+   
+ Vh u,F; 
+    F[]=varA(0,Vh);
+    u[]=A^-1*F[];
+  
+
+
+
+   plot(u,wait=1,value=1,cmm="u");
+      Vh uh=ue;
+  plot(uh,wait=1,value=1,cmm="ref");
+  Vh e=u-uh;                  
+  plot(e,wait=1,value=1,cmm="err");
+   real err0=sqrt( int2d(Th)((1-ind0)*(square(u-ue)) )); 
+   real err1=sqrt( int2d(Th)((1-ind0)* (square(dx(u)-uX)+square(dy(u)-uY))) ); 
+  real N0=sqrt( int2d(Th)((1-ind0)*square(uh) ));
+  real N1=sqrt( int2d(Th)((1-ind0)*(square(dx(uh))+square(dy(uh)))) ); 
+  fres <<"("<<theta<<","<<err1/N1<<")"<<endl;
+             
+
+}
+}
