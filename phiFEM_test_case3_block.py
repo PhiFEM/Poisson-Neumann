@@ -5,7 +5,6 @@ import sympy
 import matplotlib.pyplot as plt
 parameters['allow_extrapolation'] = True
 parameters["form_compiler"]["representation"] = 'uflacs'
-from mshr import *
 from multiphenics import *
 parameters["ghost_mode"] = "shared_facet" 
 from pyamg.util.linalg import condest
