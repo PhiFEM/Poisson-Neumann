@@ -1,7 +1,6 @@
 from __future__ import print_function
 import numpy as np
 from dolfin import *
-import sympy
 import matplotlib.pyplot as plt
 parameters['allow_extrapolation'] = True
 parameters["form_compiler"]["representation"] = 'uflacs'
