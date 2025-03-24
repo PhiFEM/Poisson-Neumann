@@ -24,7 +24,7 @@ The results can be generated using two container images:
    
    ```bash
    mkdir poisson-neumann-phifem/
-   git clone https://github.com/PhiFEM/Poisson-Neumann.git poisson-neumann-phifem
+   git clone https://github.com/PhiFEM/publication_Poisson-Neumann_multiphenics.git poisson-neumann-phifem
    ```
 
 2) Download the images from the docker.io registry, in the main directory:
