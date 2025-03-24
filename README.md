@@ -1,4 +1,4 @@
-# $\varphi$-FEM for Poisson Dirichlet
+# $\varphi$-FEM for Poisson Neumann
 
 Repository containing the codes used in M. Duprez, V. Lleras, and A. Lozinski. "A new $\phi$-FEM approach for problems with natural boundary conditions", *Numer. Methods Partial Differ. Eq. 39* (2023), 281-303. [https://doi.org/10.1002/num.22878](https://onlinelibrary.wiley.com/doi/10.1002/num.22878)
 
